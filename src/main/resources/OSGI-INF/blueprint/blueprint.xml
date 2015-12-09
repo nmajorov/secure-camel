@@ -1,57 +1,36 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<blueprint xmlns:ext="http://aries.apache.org/blueprint/xmlns/blueprint-ext/v1.0.0" xmlns:jaas="http://karaf.apache.org/xmlns/jaas/v1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
-  xsi:schemaLocation="
+
+<blueprint
+	xmlns:ext="http://aries.apache.org/blueprint/xmlns/blueprint-ext/v1.0.0"
+	xmlns:jaas="http://karaf.apache.org/xmlns/jaas/v1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0"
+	xsi:schemaLocation="
   http://www.osgi.org/xmlns/blueprint/v1.0.0 http://www.osgi.org/xmlns/blueprint/v1.0.0/blueprint.xsd
   http://aries.apache.org/blueprint/xmlns/blueprint-ext/v1.0.0 http://aries.apache.org/schemas/blueprint-ext/blueprint-ext.xsd
   http://karaf.apache.org/xmlns/jaas/v1.0.0 http://karaf.apache.org/xmlns/jaas/v1.0.0
   http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd">
 
-  <type-converters>
-    <!-- ueber important, without this one the jass config is minced on windows -->
-    <bean class="org.apache.karaf.jaas.modules.properties.PropertiesConverter"/>
-  </type-converters>
 
-  <!-- Bean to allow the $[karaf.base] property to be correctly resolved -->
-  <ext:property-placeholder placeholder-prefix="$[" placeholder-suffix="]"/>
+<bean id="headersDynamicRouter" class="biz.majorov.camel.HeadersDynamicRouter" />
 
-  <jaas:config name="karaf" rank="200">
-    <jaas:module className="org.apache.karaf.jaas.modules.properties.PropertiesLoginModule" flags="required">
-      users = $[karaf.base]/etc/users.properties
-    </jaas:module>
-  </jaas:config>
+<camelContext xmlns="http://camel.apache.org/schema/blueprint">
+  <route id="from-netty-to-http">
+    <from uri="netty4-http:http://localhost:8088/foo?bridgeEndpoint=true" id="start">
+      <description> get http request and route it to the other destination</description>
+    </from>
+    <log message="receive:  ${body}" />
+    <dynamicRouter>
+      <description> check the header and route it to different destination </description>
+      <method ref="headersDynamicRouter" method="routing"></method>
+    </dynamicRouter>
+  </route>
+  <route id="route1">
+    <from uri="direct:direct"/>
+    <to uri="http4://localhost:7000/rest?bridgeEndpoint=true"/>
+  </route>
+  <route id="route2">
+    <from uri="direct:plus"/>
+    <to uri="http4://localhost:7000/rest/plus?bridgeEndpoint=true"/>
+  </route>
+</camelContext>
 
-  <!-- The Backing Engine Factory Service for the PropertiesLoginModule -->
-  <service interface="org.apache.karaf.jaas.modules.BackingEngineFactory">
-    <bean class="org.apache.karaf.jaas.modules.properties.PropertiesBackingEngineFactory"/>
-  </service>
-
-  <bean class="org.apache.camel.component.netty4.http.SecurityConstraintMapping" id="constraint">
-    <!-- inclusions defines url -> roles restrictions -->
-    <!-- a * should be used for any role accepted (or even no roles) -->
-    <property name="inclusions">
-      <map>
-        <entry key="/*" value="*"/>
-        <entry key="/list/*" value="admin"/>
-        <entry key="/guest/*" value="admin,guest"/>
-      </map>
-    </property>
-    <!-- exclusions is used to define public urls, which requires no authentication -->
-    <property name="exclusions">
-      <set>
-        <value>/public/*</value>
-      </set>
-    </property>
-  </bean>
-
-  <camelContext trace="false" xmlns="http://camel.apache.org/schema/blueprint">
-    <route id="from-netty-to-http">
-      <!-- todo use shared netty server to map different endpoints -->
-      <from id="start"
-        uri="netty4-http:http://localhost:8088/foo?bridgeEndpoint=true&amp;matchOnUriPrefix=true&amp;securityConfiguration.realm=karaf&amp;securityConfiguration.securityConstraint=#constraint"/>
-
-      <to uri="log:biz.majorov.camel?level=INFO&amp;showAll=true&amp;multiline=true"/>
-      <!-- add another steps  -->
-      <to uri="http4://localhost:7000/rest?bridgeEndpoint=true"/>
-    </route>
-  </camelContext>
 </blueprint>
