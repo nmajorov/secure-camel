@@ -1,4 +1,3 @@
-
 <blueprint
 	xmlns:ext="http://aries.apache.org/blueprint/xmlns/blueprint-ext/v1.0.0"
 	xmlns:jaas="http://karaf.apache.org/xmlns/jaas/v1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -10,27 +9,38 @@
   http://camel.apache.org/schema/blueprint http://camel.apache.org/schema/blueprint/camel-blueprint.xsd">
 
 
-<bean id="headersDynamicRouter" class="biz.majorov.camel.HeadersDynamicRouter" />
+	<bean id="headersDynamicRouter" class="biz.majorov.camel.HeadersDynamicRouter" />
 
-<camelContext xmlns="http://camel.apache.org/schema/blueprint">
-  <route id="from-netty-to-http">
-    <from uri="netty4-http:http://localhost:8088/foo?bridgeEndpoint=true" id="start">
-      <description> get http request and route it to the other destination</description>
-    </from>
-    <log message="receive:  ${body}" />
-    <dynamicRouter>
-      <description> check the header and route it to different destination </description>
-      <method ref="headersDynamicRouter" method="routing"></method>
-    </dynamicRouter>
-  </route>
-  <route id="route1">
-    <from uri="direct:direct"/>
-    <to uri="http4://localhost:7000/rest?bridgeEndpoint=true"/>
-  </route>
-  <route id="route2">
-    <from uri="direct:plus"/>
-    <to uri="http4://localhost:7000/rest/plus?bridgeEndpoint=true"/>
-  </route>
-</camelContext>
+	<camelContext xmlns="http://camel.apache.org/schema/blueprint">
+		<route id="from-netty-to-http">
+			<from uri="netty4-http:http://localhost:8088/foo?bridgeEndpoint=true"
+				id="start">
+				<description> get http request and route it to the other destination</description>
+			</from>
+			<log message="receive:  ${body}" />
+
+			<dynamicRouter>
+				<description> check the header and route it to different destination </description>
+				<method ref="headersDynamicRouter" method="routing"></method>
+			</dynamicRouter>
+		</route>
+		<route id="route1">
+			<from uri="direct:direct" />
+			<log message="in route1" />
+
+			<setHeader headerName="parsed">
+				<constant>true</constant>
+			</setHeader>
+
+			<to uri="http4://localhost:7000/rest?bridgeEndpoint=true" />
+		</route>
+		<route id="route2">
+			<from uri="direct:plus" />
+			<setHeader headerName="parsed">
+				<constant>true</constant>
+			</setHeader>
+			<to uri="http4://localhost:7000/rest/plus?bridgeEndpoint=true" />
+		</route>
+	</camelContext>
 
 </blueprint>
